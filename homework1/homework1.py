@@ -75,4 +75,8 @@ if __name__ == '__main__':
     parser = CatalogParser(start_url='https://5ka.ru/api/v2/special_offers/',
                            category_url='https://5ka.ru/api/v2/categories/')
     parser.parse()
-    print(1)
+    
+    for key in parser.categories:
+        if key != 'OTHER':
+            with open(f'{key}.json', 'w') as file:
+                file.write(json.dumps(parser.categories[key]))
