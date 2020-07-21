@@ -172,3 +172,6 @@ if __name__ == '__main__':
     [print(pd.DataFrame.from_dict(jobs[key].jobs)) for key in jobs]
     # PANDAS WORK: printing AS STRING
     [print(pd.DataFrame.from_dict(jobs[key].jobs).to_string())for key in jobs]
+    
+    with open('result.json', 'w') as file:
+        file.write(json.dumps({'hh': jobs['hh'].jobs, 'sj': jobs['sj'].jobs}))
