@@ -1,6 +1,7 @@
 import requests
 import bs4
 import re
+import json
 
 from typing import List, Dict
 import pandas as pd
