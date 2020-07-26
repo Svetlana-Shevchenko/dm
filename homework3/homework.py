@@ -83,12 +83,16 @@ class Job:
     def _get_content_from_links(self, link: str) -> bs4.BeautifulSoup:
         return bs4.BeautifulSoup(requests.get(link, headers=self.headers).text, 'html.parser')
 
+    def _check_job(self, link: str) -> bool:
+        return self.client.jobs.find_one({'job-link': link}) is None
+
     @property
     def jobs(self) -> List:
         return [self.render_job(self._get_content_from_links(link)) for link in self._Job__links]
 
     def save_job(self, job: Dict) -> Dict:
-        self.client.jobs.insert_one(job)
+        if self._check_job(job['job-link']):
+            self.client.jobs.insert_one(job)
         return job
 
 
@@ -111,9 +115,10 @@ class HHJob(Job):
             try:
                 result['prices'] = x.select('span[data-qa="vacancy-serp__vacancy-compensation"]')[0].text. \
                     replace('\xa0', '').replace('руб.', ''). \
-                    replace('от', '').replace('до', '').strip().split('-')  # @TODO 5 min for regexp replace!!
+                    replace('от', '').replace('до', '').replace('/месяц', '').strip().split(
+                    '-')  # @TODO 5 min for regexp replace!!
                 result['job-company'] = x.select('a[data-qa="vacancy-serp__vacancy-employer"]')[0].text
-
+                result['images'] = [x['src'] for x in x.select('img.vacancy-serp-item__logo')]
             except IndexError:
 
                 pass
@@ -124,7 +129,7 @@ class HHJob(Job):
 class SJJob(Job):
 
     def __init__(self, pagination: Pagination, client: MongoClient):
-        super().__init__(pagination)
+        super().__init__(pagination, client)
 
     def render_job(self, bs: bs4.BeautifulSoup) -> Dict:
         result = {}
@@ -137,7 +142,8 @@ class SJJob(Job):
             try:
                 result['prices'] = x.select('.f-test-text-company-item-salary')[0].text. \
                     replace('\xa0', '').replace('руб.', ''). \
-                    replace('от', '').replace('до', '').strip().split('—')  # @TODO 5 min for regexp replace!!
+                    replace('от', '').replace('до', '').replace('/месяц', '').strip().split(
+                    '—')  # @TODO 5 min for regexp replace!!
                 result['job-company'] = x.select('.f-test-text-vacancy-item-company-name')[0].text
                 result['city'] = x.select('.f-test-text-company-item-location span')[2].text
 
@@ -145,6 +151,7 @@ class SJJob(Job):
 
                 result['description'] = re.search('>(.*)', desc_req[0]).group(1)
                 result['requires'] = re.search('(.*)(</span>).*', desc_req[1]).group(1)
+                result['images'] = [x['src'] for x in x.select('img')]
 
             except IndexError:
 
@@ -171,3 +178,9 @@ class JobsHub:
 if __name__ == '__main__':
     ####### NOT DONE YET, till sunday 27.07
     jobs = {key: JobsHub(resources[key], MongoClient('172.22.200.92', 27017)['jobs']) for key in resources}
+
+    try:
+        [print(x) for x in jobs['hh'].job_generator.client.jobs.find(
+            {"$and": [{"prices.0": {"$gte": f'{int(input("Write min salary"))}'}}, {"price.0": {"$ne": "По говорённости"}}]})]
+    except:
+        print('Wrong input')
